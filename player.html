@@ -4,15 +4,24 @@
   <meta charset="UTF-8">
   <title>MultiTwitch Player</title>
   <style>
+    * { box-sizing: border-box; }
     body {
       margin: 0; padding: 0; background: #000; color: #fff;
-      font-family: Arial, sans-serif; overflow: hidden; height: 100vh;
+      font-family: Arial, sans-serif; overflow: hidden; height: 100vh; width: 100vw;
     }
     #grid {
-      display: grid; width: 100vw; height: 100vh; gap: 2px;
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center; /* Zentriert unvollständige Reihen waagerecht */
+      align-content: center;   /* Zentriert das gesamte Raster senkrecht */
+      width: 100vw;
+      height: 100vh;
+      gap: 2px;
       background: #111;
     }
-    iframe { width: 100%; height: 100%; border: none; }
+    iframe {
+      border: none;
+    }
     .empty-msg {
       display: flex; justify-content: center; align-items: center;
       height: 100vh; color: #666; font-size: 18px; text-align: center;
@@ -23,13 +32,43 @@
   <div id="grid"></div>
 
   <script>
-    // Cache speichert bereits geladene Stream-Iframes
     const iframeCache = {};
 
     function getParams() {
       const hash = window.location.hash.replace(/^#/, '');
       const search = window.location.search.replace(/^\?/, '');
       return new URLSearchParams(hash || search);
+    }
+
+    // Berechnet das Raster, das die maximale Fläche für 16:9 Streams liefert
+    function getBestGrid(N, screenW, screenH) {
+      if (N <= 0) return { cols: 1, rows: 1 };
+      let bestArea = 0;
+      let bestCols = 1;
+      let bestRows = N;
+      const targetAspect = 16 / 9;
+
+      for (let cols = 1; cols <= N; cols++) {
+        const rows = Math.ceil(N / cols);
+        const cellW = screenW / cols;
+        const cellH = screenH / rows;
+
+        // Einpassen in 16:9
+        let vW = cellW;
+        let vH = cellW / targetAspect;
+        if (vH > cellH) {
+          vH = cellH;
+          vW = cellH * targetAspect;
+        }
+        const area = vW * vH;
+
+        if (area > bestArea) {
+          bestArea = area;
+          bestCols = cols;
+          bestRows = rows;
+        }
+      }
+      return { cols: bestCols, rows: bestRows };
     }
 
     function updateGrid() {
@@ -39,14 +78,13 @@
       const newChannels = channelsParam.split(',').filter(Boolean);
       const grid = document.getElementById('grid');
 
-      // Dynamische Tab-Titel
+      // Dynamischer Tab-Titel
       if (screenType === '1') {
         document.title = newChannels.length > 0 ? "🔴 Imposter & Favoriten" : "🔴 Screen 1 (Leer)";
       } else {
         document.title = newChannels.length > 0 ? "🟢 Crewmates" : "🟢 Screen 2 (Leer)";
       }
 
-      // Wenn keine Kanäle ausgewählt sind
       if (newChannels.length === 0) {
         Object.keys(iframeCache).forEach(name => {
           iframeCache[name].remove();
@@ -59,16 +97,21 @@
       const emptyMsg = grid.querySelector('.empty-msg');
       if (emptyMsg) emptyMsg.remove();
 
-      // Grid-Raster berechnen
       const count = newChannels.length;
-      const cols = Math.ceil(Math.sqrt(count));
-      const rows = Math.ceil(count / cols);
-      grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
-      grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+      const screenW = window.innerWidth;
+      const screenH = window.innerHeight;
+      
+      // Optimales Raster ermitteln
+      const { cols, rows } = getBestGrid(count, screenW, screenH);
+
+      // Berechne exakte Kachelgrößen inklusive Abständen
+      const gap = 2;
+      const itemWidth = `calc((100% - ${(cols - 1) * gap}px) / ${cols})`;
+      const itemHeight = `calc((100% - ${(rows - 1) * gap}px) / ${rows})`;
 
       const hostDomain = window.location.hostname;
 
-      // 1. Streams entfernen, die nicht mehr in diesem Fenster sind
+      // 1. Nicht mehr benötigte Streams entfernen
       Object.keys(iframeCache).forEach(name => {
         if (!newChannels.includes(name)) {
           iframeCache[name].remove();
@@ -76,7 +119,7 @@
         }
       });
 
-      // 2. Neue Streams einfügen & bestehende Streams per CSS 'order' sortieren (OHNE Reload!)
+      // 2. Streams aktualisieren/einfügen (OHNE Reload, Audio bleibt an!)
       newChannels.forEach((name, index) => {
         if (!iframeCache[name]) {
           const iframe = document.createElement('iframe');
@@ -86,13 +129,16 @@
           grid.appendChild(iframe);
         }
         
-        // Verschiebt das Video optisch im Raster, ohne das Iframe neu zu laden
-        iframeCache[name].style.order = index;
+        const iframe = iframeCache[name];
+        iframe.style.width = itemWidth;
+        iframe.style.height = itemHeight;
+        iframe.style.order = index; // Visuelles Umlagern ohne Reload
       });
     }
 
-    // Lauscht auf Hash-Änderungen (#screen=...&channels=...)
+    // Bei Hash-Änderungen oder Browser-Skalierung neu berechnen
     window.addEventListener('hashchange', updateGrid);
+    window.addEventListener('resize', updateGrid);
     window.addEventListener('load', updateGrid);
   </script>
 </body>
