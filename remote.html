@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+  <title>MultiTwitch Fernbedienung</title>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <style>
+    :root {
+      --bg: #09090b; --card: #18181b; --accent: #9146ff;
+      --danger: #eb0400; --star: #ffda00; --text: #efeff1; --border: #27272a;
+    }
+    body {
+      margin: 0; padding: 16px; background: var(--bg); color: var(--text);
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      user-select: none; -webkit-user-select: none;
+    }
+    .header { text-align: center; margin-bottom: 16px; }
+    .status { font-size: 12px; padding: 4px 8px; border-radius: 12px; background: #333; display: inline-block; }
+    .status.online { background: #00f59b; color: #000; font-weight: bold; }
+    
+    .streamer-card {
+      background: var(--card); border: 1px solid var(--border); border-radius: 10px;
+      padding: 12px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;
+    }
+    .streamer-name { font-size: 16px; font-weight: bold; }
+    .actions { display: flex; gap: 8px; }
+    .touch-btn {
+      width: 48px; height: 48px; border-radius: 8px; border: 1px solid var(--border);
+      background: #27272a; font-size: 20px; display: flex; align-items: center;
+      justify-content: center; cursor: pointer;
+    }
+    .touch-btn:active { transform: scale(0.95); }
+    .star-btn.active { background: #3a3200; border-color: var(--star); }
+    .sword-btn.active { background: #3a0000; border-color: var(--danger); }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <h2 style="margin:0 0 6px 0; color: var(--accent);">🎮 MultiTwitch Remote</h2>
+    <div id="status" class="status">Verbinde mit PC...</div>
+  </div>
+
+  <div id="list"></div>
+
+  <script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const targetPeerId = urlParams.get('id');
+    const statusEl = document.getElementById('status');
+    const listEl = document.getElementById('list');
+
+    let streamers = [];
+    let conn = null;
+
+    if (!targetPeerId) {
+      statusEl.textContent = "❌ Keine Verbindung-ID gefunden!";
+    } else {
+      const peer = new Peer();
+
+      peer.on('open', () => {
+        conn = peer.connect(targetPeerId);
+
+        conn.on('open', () => {
+          statusEl.textContent = "🟢 Mit PC verbunden";
+          statusEl.classList.add('online');
+        });
+
+        conn.on('data', (data) => {
+          if (data.type === 'SYNC') {
+            streamers = data.streamers;
+            render();
+          }
+        });
+
+        conn.on('close', () => {
+          statusEl.textContent = "🔴 Verbindung getrennt";
+          statusEl.classList.remove('online');
+        });
+      });
+    }
+
+    function toggleRole(idx, role) {
+      if (role === 'star') streamers[idx].star = !streamers[idx].star;
+      if (role === 'sword') streamers[idx].sword = !streamers[idx].sword;
+      
+      render();
+
+      // Signal sofort per WebRTC an den PC schicken
+      if (conn && conn.open) {
+        conn.send({ type: 'UPDATE_STREAMERS', streamers: streamers });
+      }
+    }
+
+    function render() {
+      listEl.innerHTML = '';
+      const actives = streamers.filter(s => s.active);
+
+      if (actives.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center; color:#666; margin-top:40px;">Keine aktiven Spieler ausgewählt.</div>';
+        return;
+      }
+
+      actives.forEach((s) => {
+        const idx = streamers.findIndex(item => item.name === s.name);
+        const card = document.createElement('div');
+        card.className = 'streamer-card';
+        card.innerHTML = `
+          <span class="streamer-name">${s.name}</span>
+          <div class="actions">
+            <div class="touch-btn star-btn ${s.star ? 'active' : ''}">⭐</div>
+            <div class="touch-btn sword-btn ${s.sword ? 'active' : ''}">⚔️</div>
+          </div>
+        `;
+
+        card.querySelector('.star-btn').onclick = () => toggleRole(idx, 'star');
+        card.querySelector('.sword-btn').onclick = () => toggleRole(idx, 'sword');
+        listEl.appendChild(card);
+      });
+    }
+  </script>
+</body>
+</html>
