@@ -16,9 +16,16 @@
       user-select: none; -webkit-user-select: none;
     }
     .header { text-align: center; margin-bottom: 16px; }
-    .status { font-size: 12px; padding: 4px 8px; border-radius: 12px; background: #333; display: inline-block; }
+    .status { font-size: 12px; padding: 4px 8px; border-radius: 12px; background: #333; display: inline-block; margin-bottom: 10px; }
     .status.online { background: #00f59b; color: #000; font-weight: bold; }
     
+    .reload-btn {
+      width: 100%; padding: 10px; background: #27272a; color: var(--text);
+      border: 1px solid var(--border); border-radius: 8px; font-weight: bold;
+      font-size: 13px; cursor: pointer; margin-bottom: 14px;
+    }
+    .reload-btn:active { background: #3f3f46; transform: scale(0.98); }
+
     .streamer-card {
       background: var(--card); border: 1px solid var(--border); border-radius: 10px;
       padding: 12px; margin-bottom: 10px; display: flex; align-items: center; justify-content: space-between;
@@ -39,6 +46,9 @@
   <div class="header">
     <h2 style="margin:0 0 6px 0; color: var(--accent);">🎮 MultiTwitch Remote</h2>
     <div id="status" class="status">Verbinde mit PC...</div>
+    <div>
+      <button id="reload-btn" class="reload-btn">🔄 Streams neuladen (Latenz angleichen)</button>
+    </div>
   </div>
 
   <div id="list"></div>
@@ -48,6 +58,7 @@
     const targetPeerId = urlParams.get('id');
     const statusEl = document.getElementById('status');
     const listEl = document.getElementById('list');
+    const reloadBtn = document.getElementById('reload-btn');
 
     let streamers = [];
     let conn = null;
@@ -78,6 +89,18 @@
         });
       });
     }
+
+    reloadBtn.onclick = () => {
+      if (conn && conn.open) {
+        conn.send({ type: 'RELOAD_TABS' });
+        reloadBtn.textContent = '✓ Neu geladen!';
+        setTimeout(() => {
+          reloadBtn.textContent = '🔄 Streams neuladen (Latenz angleichen)';
+        }, 1200);
+      } else {
+        alert("Keine aktive Verbindung zum PC!");
+      }
+    };
 
     function toggleRole(idx, role) {
       if (role === 'star') streamers[idx].star = !streamers[idx].star;
