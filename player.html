@@ -12,8 +12,8 @@
     #grid {
       display: flex;
       flex-wrap: wrap;
-      justify-content: center; /* Zentriert unvollständige Reihen waagerecht */
-      align-content: center;   /* Zentriert das gesamte Raster senkrecht */
+      justify-content: center;
+      align-content: center;
       width: 100vw;
       height: 100vh;
       gap: 2px;
@@ -25,6 +25,7 @@
     .empty-msg {
       display: flex; justify-content: center; align-items: center;
       height: 100vh; color: #666; font-size: 18px; text-align: center;
+      width: 100%;
     }
   </style>
 </head>
@@ -40,7 +41,6 @@
       return new URLSearchParams(hash || search);
     }
 
-    // Berechnet das Raster, das die maximale Fläche für 16:9 Streams liefert
     function getBestGrid(N, screenW, screenH) {
       if (N <= 0) return { cols: 1, rows: 1 };
       let bestArea = 0;
@@ -53,7 +53,6 @@
         const cellW = screenW / cols;
         const cellH = screenH / rows;
 
-        // Einpassen in 16:9
         let vW = cellW;
         let vH = cellW / targetAspect;
         if (vH > cellH) {
@@ -78,7 +77,6 @@
       const newChannels = channelsParam.split(',').filter(Boolean);
       const grid = document.getElementById('grid');
 
-      // Dynamischer Tab-Titel
       if (screenType === '1') {
         document.title = newChannels.length > 0 ? "🔴 Imposter & Favoriten" : "🔴 Screen 1 (Leer)";
       } else {
@@ -101,17 +99,12 @@
       const screenW = window.innerWidth;
       const screenH = window.innerHeight;
       
-      // Optimales Raster ermitteln
       const { cols, rows } = getBestGrid(count, screenW, screenH);
-
-      // Berechne exakte Kachelgrößen inklusive Abständen
       const gap = 2;
       const itemWidth = `calc((100% - ${(cols - 1) * gap}px) / ${cols})`;
       const itemHeight = `calc((100% - ${(rows - 1) * gap}px) / ${rows})`;
-
       const hostDomain = window.location.hostname;
 
-      // 1. Nicht mehr benötigte Streams entfernen
       Object.keys(iframeCache).forEach(name => {
         if (!newChannels.includes(name)) {
           iframeCache[name].remove();
@@ -119,7 +112,6 @@
         }
       });
 
-      // 2. Streams aktualisieren/einfügen (OHNE Reload, Audio bleibt an!)
       newChannels.forEach((name, index) => {
         if (!iframeCache[name]) {
           const iframe = document.createElement('iframe');
@@ -132,11 +124,10 @@
         const iframe = iframeCache[name];
         iframe.style.width = itemWidth;
         iframe.style.height = itemHeight;
-        iframe.style.order = index; // Visuelles Umlagern ohne Reload
+        iframe.style.order = index; 
       });
     }
 
-    // Bei Hash-Änderungen oder Browser-Skalierung neu berechnen
     window.addEventListener('hashchange', updateGrid);
     window.addEventListener('resize', updateGrid);
     window.addEventListener('load', updateGrid);
