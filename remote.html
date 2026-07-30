@@ -85,7 +85,6 @@
       
       render();
 
-      // Signal sofort per WebRTC an den PC schicken
       if (conn && conn.open) {
         conn.send({ type: 'UPDATE_STREAMERS', streamers: streamers });
       }
