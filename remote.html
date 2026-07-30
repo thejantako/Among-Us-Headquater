@@ -62,11 +62,18 @@
 
     let streamers = [];
     let conn = null;
+    let peer = null;
 
-    if (!targetPeerId) {
-      statusEl.textContent = "❌ Keine Verbindung-ID gefunden!";
-    } else {
-      const peer = new Peer();
+    function connectToPC() {
+      if (!targetPeerId) {
+        statusEl.textContent = "❌ Keine Verbindung-ID gefunden!";
+        return;
+      }
+
+      statusEl.textContent = "Verbinde mit PC...";
+      statusEl.classList.remove('online');
+
+      peer = new Peer();
 
       peer.on('open', () => {
         conn = peer.connect(targetPeerId);
@@ -84,10 +91,24 @@
         });
 
         conn.on('close', () => {
-          statusEl.textContent = "🔴 Verbindung getrennt";
+          statusEl.textContent = "🔴 Getrennt. Verbinde neu...";
           statusEl.classList.remove('online');
+          attemptReconnect();
+        });
+
+        conn.on('error', () => {
+          attemptReconnect();
         });
       });
+
+      peer.on('error', () => {
+        attemptReconnect();
+      });
+    }
+
+    function attemptReconnect() {
+      try { if (peer) peer.destroy(); } catch(e) {}
+      setTimeout(connectToPC, 3000);
     }
 
     reloadBtn.onclick = () => {
@@ -139,6 +160,8 @@
         listEl.appendChild(card);
       });
     }
+
+    connectToPC();
   </script>
 </body>
 </html>
