@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>MultiTwitch Fernbedienung</title>
+  <title>Among Us Headquater Remote</title>
   <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
   <style>
     :root {
@@ -16,8 +16,9 @@
       user-select: none; -webkit-user-select: none;
     }
     .header { text-align: center; margin-bottom: 16px; }
-    .status { font-size: 12px; padding: 4px 8px; border-radius: 12px; background: #333; display: inline-block; margin-bottom: 10px; }
+    .status { font-size: 12px; padding: 4px 8px; border-radius: 12px; background: #333; display: inline-block; margin-bottom: 10px; transition: all 0.3s; }
     .status.online { background: #00f59b; color: #000; font-weight: bold; }
+    .status.offline { background: #eb0400; color: #fff; font-weight: bold; }
     
     .reload-btn {
       width: 100%; padding: 10px; background: #27272a; color: var(--text);
@@ -44,7 +45,7 @@
 </head>
 <body>
   <div class="header">
-    <h2 style="margin:0 0 6px 0; color: var(--accent);">🎮 MultiTwitch Remote</h2>
+    <h2 style="margin:0 0 6px 0; color: var(--accent);">🎮 Among Us Headquater</h2>
     <div id="status" class="status">Verbinde mit PC...</div>
     <div>
       <button id="reload-btn" class="reload-btn">🔄 Streams neuladen (Latenz angleichen)</button>
@@ -63,105 +64,46 @@
     let streamers = [];
     let conn = null;
     let peer = null;
+    let heartbeatInterval = null;
+    let wakeLock = null;
+
+    // 1. Verhindert, dass das Display am Handy ausgeht (Wake Lock)
+    async function requestWakeLock() {
+      try {
+        if ('wakeLock' in navigator) {
+          wakeLock = await navigator.wakeLock.request('screen');
+        }
+      } catch (err) {
+        console.log("WakeLock Info:", err.message);
+      }
+    }
 
     function connectToPC() {
       if (!targetPeerId) {
-        statusEl.textContent = "❌ Keine Verbindung-ID gefunden!";
+        statusEl.textContent = "❌ Keine Verbindungs-ID!";
+        statusEl.className = "status offline";
         return;
       }
 
-      statusEl.textContent = "Verbinde mit PC...";
-      statusEl.classList.remove('online');
+      statusEl.textContent = "Verbinde...";
+      statusEl.className = "status";
+
+      if (peer) {
+        try { peer.destroy(); } catch(e) {}
+      }
 
       peer = new Peer();
 
       peer.on('open', () => {
-        conn = peer.connect(targetPeerId);
+        conn = peer.connect(targetPeerId, { reliable: true });
 
         conn.on('open', () => {
           statusEl.textContent = "🟢 Mit PC verbunden";
-          statusEl.classList.add('online');
+          statusEl.className = "status online";
+          startHeartbeat();
+          requestWakeLock();
         });
 
         conn.on('data', (data) => {
           if (data.type === 'SYNC') {
-            streamers = data.streamers;
-            render();
-          }
-        });
-
-        conn.on('close', () => {
-          statusEl.textContent = "🔴 Getrennt. Verbinde neu...";
-          statusEl.classList.remove('online');
-          attemptReconnect();
-        });
-
-        conn.on('error', () => {
-          attemptReconnect();
-        });
-      });
-
-      peer.on('error', () => {
-        attemptReconnect();
-      });
-    }
-
-    function attemptReconnect() {
-      try { if (peer) peer.destroy(); } catch(e) {}
-      setTimeout(connectToPC, 3000);
-    }
-
-    reloadBtn.onclick = () => {
-      if (conn && conn.open) {
-        conn.send({ type: 'RELOAD_TABS' });
-        reloadBtn.textContent = '✓ Neu geladen!';
-        setTimeout(() => {
-          reloadBtn.textContent = '🔄 Streams neuladen (Latenz angleichen)';
-        }, 1200);
-      } else {
-        alert("Keine aktive Verbindung zum PC!");
-      }
-    };
-
-    function toggleRole(idx, role) {
-      if (role === 'star') streamers[idx].star = !streamers[idx].star;
-      if (role === 'sword') streamers[idx].sword = !streamers[idx].sword;
-      
-      render();
-
-      if (conn && conn.open) {
-        conn.send({ type: 'UPDATE_STREAMERS', streamers: streamers });
-      }
-    }
-
-    function render() {
-      listEl.innerHTML = '';
-      const actives = streamers.filter(s => s.active);
-
-      if (actives.length === 0) {
-        listEl.innerHTML = '<div style="text-align:center; color:#666; margin-top:40px;">Keine aktiven Spieler ausgewählt.</div>';
-        return;
-      }
-
-      actives.forEach((s) => {
-        const idx = streamers.findIndex(item => item.name === s.name);
-        const card = document.createElement('div');
-        card.className = 'streamer-card';
-        card.innerHTML = `
-          <span class="streamer-name">${s.name}</span>
-          <div class="actions">
-            <div class="touch-btn star-btn ${s.star ? 'active' : ''}">⭐</div>
-            <div class="touch-btn sword-btn ${s.sword ? 'active' : ''}">⚔️</div>
-          </div>
-        `;
-
-        card.querySelector('.star-btn').onclick = () => toggleRole(idx, 'star');
-        card.querySelector('.sword-btn').onclick = () => toggleRole(idx, 'sword');
-        listEl.appendChild(card);
-      });
-    }
-
-    connectToPC();
-  </script>
-</body>
-</html>
+            streamers =
