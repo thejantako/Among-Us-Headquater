@@ -67,7 +67,6 @@
     let heartbeatInterval = null;
     let wakeLock = null;
 
-    // 1. Verhindert, dass das Display am Handy ausgeht (Wake Lock)
     async function requestWakeLock() {
       try {
         if ('wakeLock' in navigator) {
@@ -92,7 +91,10 @@
         try { peer.destroy(); } catch(e) {}
       }
 
-      peer = new Peer();
+      // pingInterval hält die Server-Verbindung für das Handy aufrecht
+      peer = new Peer({
+        pingInterval: 10000
+      });
 
       peer.on('open', () => {
         conn = peer.connect(targetPeerId, { reliable: true });
@@ -106,4 +108,113 @@
 
         conn.on('data', (data) => {
           if (data.type === 'SYNC') {
-            streamers =
+            streamers = data.streamers;
+            render();
+          }
+        });
+
+        conn.on('close', () => {
+          handleDisconnect();
+        });
+
+        conn.on('error', () => {
+          handleDisconnect();
+        });
+      });
+
+      peer.on('error', (err) => {
+        console.error("Peer error:", err);
+        handleDisconnect();
+      });
+    }
+
+    function handleDisconnect() {
+      stopHeartbeat();
+      statusEl.textContent = "🔴 Getrennt. Verbinde neu...";
+      statusEl.className = "status offline";
+      setTimeout(() => {
+        if (!conn || !conn.open) {
+          connectToPC();
+        }
+      }, 2000);
+    }
+
+    // Pingt den PC alle 5 Sekunden aktiv an, damit Router & Handy die Datenverbindung nicht kappen
+    function startHeartbeat() {
+      stopHeartbeat();
+      heartbeatInterval = setInterval(() => {
+        if (conn && conn.open) {
+          conn.send({ type: 'PING' });
+        } else {
+          handleDisconnect();
+        }
+      }, 5000);
+    }
+
+    function stopHeartbeat() {
+      if (heartbeatInterval) clearInterval(heartbeatInterval);
+    }
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') {
+        requestWakeLock();
+        if (!conn || !conn.open) {
+          connectToPC();
+        }
+      }
+    });
+
+    reloadBtn.onclick = () => {
+      if (conn && conn.open) {
+        conn.send({ type: 'RELOAD_TABS' });
+        reloadBtn.textContent = '✓ Neu geladen!';
+        setTimeout(() => {
+          reloadBtn.textContent = '🔄 Streams neuladen (Latenz angleichen)';
+        }, 1200);
+      } else {
+        alert("Keine Verbindung zum PC!");
+      }
+    };
+
+    function toggleRole(idx, role) {
+      if (role === 'star') streamers[idx].star = !streamers[idx].star;
+      if (role === 'sword') streamers[idx].sword = !streamers[idx].sword;
+      
+      render();
+
+      if (conn && conn.open) {
+        conn.send({ type: 'UPDATE_STREAMERS', streamers: streamers });
+      }
+    }
+
+    function render() {
+      listEl.innerHTML = '';
+      const actives = streamers.filter(s => s.active);
+
+      if (actives.length === 0) {
+        listEl.innerHTML = '<div style="text-align:center; color:#666; margin-top:40px;">Keine aktiven Spieler ausgewählt.</div>';
+        return;
+      }
+
+      actives.forEach((s) => {
+        const idx = streamers.findIndex(item => item.name === s.name);
+        const card = document.createElement('div');
+        card.className = 'streamer-card';
+        card.innerHTML = `
+          <span class="streamer-name">${s.name}</span>
+          <div class="actions">
+            <div class="touch-btn star-btn ${s.star ? 'active' : ''}">⭐</div>
+            <div class="touch-btn sword-btn ${s.sword ? 'active' : ''}">⚔️</div>
+          </div>
+        `;
+
+        card.querySelector('.star-btn').onclick = () => toggleRole(idx, 'star');
+        card.querySelector('.sword-btn').onclick = () => toggleRole(idx, 'sword');
+        listEl.appendChild(card);
+      });
+    }
+
+    connectToPC();
+  </script>
+</body>
+</html>
