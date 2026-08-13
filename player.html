@@ -104,9 +104,10 @@
       const gap = 2;
       const itemWidth = `calc((100% - ${(cols - 1) * gap}px) / ${cols})`;
       const itemHeight = `calc((100% - ${(rows - 1) * gap}px) / ${rows})`;
+
+      // Sichere Ermittlung der Domain für Twitch Parent
       const hostDomain = window.location.hostname || "localhost";
 
-      // Entferne gelöschte Streams
       Object.keys(iframeCache).forEach(name => {
         if (!newChannels.includes(name)) {
           iframeCache[name].remove();
@@ -114,26 +115,12 @@
         }
       });
 
-      // Erstelle/Aktualisiere Stream-iFrames
       newChannels.forEach((name, index) => {
         if (!iframeCache[name]) {
           const iframe = document.createElement('iframe');
+          // Standard-iFrame Einbindung
           iframe.src = `https://player.twitch.tv/?channel=${name}&parent=${hostDomain}&muted=true&autoplay=true`;
-          iframe.allow = "autoplay; fullscreen";
           iframe.allowFullscreen = true;
-          
-          // Versucht nach dem Laden automatisch die Auflösung zu begrenzen
-          iframe.addEventListener('load', () => {
-            setTimeout(() => {
-              try {
-                iframe.contentWindow.postMessage(JSON.stringify({
-                  eventName: 'setQuality',
-                  params: '480p30'
-                }), '*');
-              } catch (e) {}
-            }, 2000);
-          });
-
           iframeCache[name] = iframe;
           grid.appendChild(iframe);
         }
