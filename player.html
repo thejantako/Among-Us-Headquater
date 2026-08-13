@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <title>MultiTwitch Player</title>
+  <script src="https://player.twitch.tv/js/embed/v1.js"></script>
   <style>
     * { box-sizing: border-box; }
     body {
@@ -19,7 +20,12 @@
       gap: 2px;
       background: #111;
     }
-    iframe {
+    .player-wrapper {
+      background: #000;
+    }
+    .player-wrapper iframe {
+      width: 100% !important;
+      height: 100% !important;
       border: none;
     }
     .empty-msg {
@@ -28,13 +34,12 @@
       width: 100%;
     }
   </style>
-  <script src="https://player.twitch.tv/js/embed/v1.js"></script>
 </head>
 <body>
   <div id="grid"></div>
 
   <script>
-    const iframeCache = {};
+    const playerCache = {};
 
     function getParams() {
       const hash = window.location.hash.replace(/^#/, '');
@@ -81,75 +86,4 @@
       if (screenType === '1') {
         document.title = newChannels.length > 0 ? "🔴 Imposter & Favoriten" : "🔴 Screen 1 (Leer)";
       } else {
-        document.title = newChannels.length > 0 ? "🟢 Crewmates" : "🟢 Screen 2 (Leer)";
-      }
-
-      if (newChannels.length === 0) {
-        Object.keys(iframeCache).forEach(name => {
-          iframeCache[name].remove();
-          delete iframeCache[name];
-        });
-        grid.innerHTML = `<div class="empty-msg">Keine aktiven Streams für Bildschirm ${screenType} ausgewählt.</div>`;
-        return;
-      }
-
-      const emptyMsg = grid.querySelector('.empty-msg');
-      if (emptyMsg) emptyMsg.remove();
-
-      const count = newChannels.length;
-      const screenW = window.innerWidth;
-      const screenH = window.innerHeight;
-      
-      const { cols, rows } = getBestGrid(count, screenW, screenH);
-      const gap = 2;
-      const itemWidth = `calc((100% - ${(cols - 1) * gap}px) / ${cols})`;
-      const itemHeight = `calc((100% - ${(rows - 1) * gap}px) / ${rows})`;
-      const hostDomain = window.location.hostname;
-
-      Object.keys(iframeCache).forEach(name => {
-        if (!newChannels.includes(name)) {
-          iframeCache[name].remove();
-          delete iframeCache[name];
-        }
-      });
-
-newChannels.forEach((name, index) => {
-  let container = iframeCache[name];
-
-  if (!container) {
-    // 1. Erstelle ein Wrapper-Div für den Player
-    container = document.createElement('div');
-    container.id = `player-${name}`;
-    grid.appendChild(container);
-
-    // 2. Initialisiere den Twitch Player über das SDK
-    const player = new Twitch.Player(`player-${name}`, {
-      channel: name,
-      parent: [hostDomain],
-      muted: true,
-      width: "100%",
-      height: "100%"
-    });
-
-    // 3. Sobald der Player bereit ist: Qualität manuell DROSSELN!
-    player.addEventListener(Twitch.Player.READY, () => {
-      // Drosselt den Stream z.B. fest auf 480p30 oder 720p30
-      // Das spart extrem viel Bandbreite bei mehreren Streams!
-      player.setQuality("720p60"); 
-    });
-
-    iframeCache[name] = container;
-  }
-
-  // Layout-Anpassung
-  container.style.width = itemWidth;
-  container.style.height = itemHeight;
-  container.style.order = index;
-});
-
-    window.addEventListener('hashchange', updateGrid);
-    window.addEventListener('resize', updateGrid);
-    window.addEventListener('load', updateGrid);
-  </script>
-</body>
-</html>
+        document.title = newChannels.length >
