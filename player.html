@@ -134,7 +134,7 @@ newChannels.forEach((name, index) => {
     player.addEventListener(Twitch.Player.READY, () => {
       // Drosselt den Stream z.B. fest auf 480p30 oder 720p30
       // Das spart extrem viel Bandbreite bei mehreren Streams!
-      player.setQuality("480p30"); 
+      player.setQuality("720p60"); 
     });
 
     iframeCache[name] = container;
